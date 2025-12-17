@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package dfs.v1;
+
+option go_package = "github.com/ayushchoudhary-3190/grpc_project/backend/pb;pb";
+
+service MetaService{
+    rpc UploadRequest(UploadFileRequest) returns (UploadFileResponse);
+    rpc DeleteRequest(DeleteFileRequest) returns (DeleteFileResponse);
+    rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+    rpc GetFile(GetFileRequest) returns (GetFileResponse);
+
+    rpc AllocateChunks(AllocateChunksRequest) returns (AllocateChunksResponse);
+    rpc GetChunksLocations(GetChunkLocationRequest) returns (GetChunkLocationResponse);
+}
+
+service DataNodeService {
+  rpc WriteChunk(stream ChunkWriteRequest) returns (ChunkWriteResponse);
+  rpc ReadChunk(ChunkReadRequest) returns (stream ChunkReadResponse);
+  rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
+}
+
+service NodeControlService {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ReportChunks(ReportChunksRequest) returns (ReportChunksResponse);
+}
+
+
+message UploadFileRequest{
+    string filename = 1;
+    string path = 2;
+    int64  size = 3;
+}
+
+message UploadFileResponse{
+    string path = 1;
+    string response = 2;
+}
+
+message DeleteFileRequest{
+    string path = 1;
+}
+
+message DeleteFileResponse{
+    string message = 1;
+}
+
+
+message ListFilesRequest{
+    string owner= 1;
+    int64  owner_id = 2;
+}
+
+
+message ListFilesResponse{
+    string path = 1;
+    string owner = 2;
+    int64  owner_id =3;
+    int64  count = 4;
+}
+
+message GetFileRequest{
+    int64 owner_id = 1;
+    string path = 2;
+}
+
+message GetFileResponse{
+    int64 owner_id = 1;
+    string path = 2;
+    int64 size = 3;
+    repeated ChunkMetaData chunks = 4;
+}
+
+message ChunkMetaData{
+    string chunk_id = 1;
+    int32  index = 2;
+    int64  size = 3;
+}
+
+message AllocateChunksRequest{
+    string file_id =1;
+    int64  size = 2;
+    int64  count = 3;
+}
+
+message AllocateChunksResponse{
+    string file_id = 1;
+    repeated ChunkLocation chunks = 2;
+}
+
+message GetChunkLocationRequest{
+    string file_id = 1;
+}
+
+message GetChunkLocationResponse{
+    repeated ChunkLocation locs = 1;
+}
+message ChunkLocation{
+    string chunk_id = 1;
+    int32  index = 2;
+    repeated DataNodeEndpoint replicas = 3;
+}
+
+message DataNodeEndpoint{
+    string node_id = 1;
+    string address = 2;
+}
+
+message ChunkWriteRequest{
+    string chunk_id = 1;
+    bytes  data = 2;
+    uint64 offset = 3;
+    bool eof = 4;
+}
+
+message ChunkWriteResponse{
+    bool ok = 1;
+}
+
+message ChunkReadRequest{
+    string chunk_id = 1;
+    uint64 offset = 2;
+    uint64 length = 3;
+}
+
+message ChunkReadResponse{
+    bytes data =1;
+    bool eof =2;
+}
+
+message DeleteChunkRequest{
+    string chunk_id =1;
+}
+
+message DeleteChunkResponse{
+
+}
+
+message HeartbeatRequest{
+    string node_id =1;
+    string address = 2;
+    int64 capacity_bytes =3;
+    int64 used_bytes =4;
+}
+
+message HeartbeatResponse{}
+
+message ReportChunksRequest{
+    string node_id =1;
+    repeated string chunk_ids =2;
+}
+
+message ReportChunksResponse{}
+
