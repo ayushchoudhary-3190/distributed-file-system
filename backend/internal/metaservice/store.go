@@ -4,7 +4,7 @@ type FileStore interface{
 	CreateFile(fileName string,ownerName string) (int64, error)
 	DeleteFile(fileID int64 ) (string,error)
 	GetAllFiles(ownerID string) ([]string,error)
-	GetOneFile(fileID int64) ([]string,error)
+	GetFile(fileID int64) ([]string,error)
 }
 
 type ChunkStore interface{
