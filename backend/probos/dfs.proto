@@ -28,8 +28,8 @@ service NodeControlService {
 
 message UploadFileRequest{
     string filename = 1;
-    string path = 2;
-    int64  size = 3;
+    int64  size = 2;
+    repeated ChunkMetaData chunks = 3;
 }
 
 message UploadFileResponse{

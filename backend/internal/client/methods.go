@@ -4,16 +4,27 @@ import (
 	"log"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/metaservice"
+	"github.com/ayushchoudhary-3190/Distributed_file_system/pb/github.com/ayushchoudhary-3190/grpc_project/backend/pb"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 
 
-func AddFile(newFile *metaservice.NewFile_Params) (uuid.UUID,string) {
-	fileID,err:= metaservice.CreateFile(newFile)
+func AddFile(newFile *pb.UploadFileRequest) (string,string) {
+	file:=
+	fileID:= uuid.New()
+
+	// Allocate metadata to chunks
+	chunkMetadata:= metaservice.AllocateChunks(fileID,newFile.fileSize,count)
+	// write chunks to disk and datanode table
+	err:= datanodeservice.WriteChunks(chunkMetadata,file,offset,size)
 	if err!=nil{
-		log.Fatal("failed to create metaservice entry")
+		log.Fatal("failed to write chunk to disk")
+		return "Server Error :" , "Failure in writing chunks on the disk"
 	}
 
+	// Write metadata to metaservice
+	path,res:= metaservice.UploadRequest(newFile.Filename,newFile.size,newFile.chunks)
+	return path,res
 }
