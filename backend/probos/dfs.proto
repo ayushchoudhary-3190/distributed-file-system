@@ -66,15 +66,16 @@ message ListFilesResponse{
 }
 
 message GetFileRequest{
-    int64 owner_id = 1;
+    string owner_id = 1;
     string path = 2;
 }
 
 message GetFileResponse{
-    int64 owner_id = 1;
+    string owner_id = 1;
     string path = 2;
     int64 size = 3;
     repeated ChunkMetaData chunks = 4;
+    string err=5;
 }
 
 message ChunkMetaData{
