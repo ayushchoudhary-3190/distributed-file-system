@@ -4,8 +4,11 @@ package dfs.v1;
 
 option go_package = "github.com/ayushchoudhary-3190/grpc_project/backend/pb;pb";
 
+// Service to store file metadata
 service MetaService{
+    // Uploadrequest stores new file metadata to metaservice table
     rpc UploadRequest(UploadFileRequest) returns (UploadFileResponse);
+    // Deleterequest deletes file metadata of given file
     rpc DeleteRequest(DeleteFileRequest) returns (DeleteFileResponse);
     rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
     rpc GetFile(GetFileRequest) returns (GetFileResponse);
@@ -17,6 +20,7 @@ service MetaService{
 service DataNodeService {
   rpc WriteChunk(stream ChunkWriteRequest) returns (ChunkWriteResponse);
   rpc ReadChunk(ChunkReadRequest) returns (stream ChunkReadResponse);
+  // DeleteChunk deletes a chunk from the data node
   rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
 }
 
@@ -43,6 +47,7 @@ message DeleteFileRequest{
 
 message DeleteFileResponse{
     string message = 1;
+    string error=2;
 }
 
 
@@ -129,11 +134,11 @@ message ChunkReadResponse{
 }
 
 message DeleteChunkRequest{
-    string chunk_id =1;
+    string file_id =1;
 }
 
 message DeleteChunkResponse{
-
+    string response = 1;
 }
 
 message HeartbeatRequest{

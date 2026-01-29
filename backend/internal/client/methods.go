@@ -10,7 +10,7 @@ import (
 )
 
 
-
+// Client function to add a new file 
 func AddFile(newFile *pb.UploadFileRequest) (string,string) {
 	file:=
 	fileID:= uuid.New()
@@ -28,3 +28,19 @@ func AddFile(newFile *pb.UploadFileRequest) (string,string) {
 	path,res:= metaservice.UploadRequest(newFile.Filename,newFile.size,newFile.chunks)
 	return path,res
 }
+
+// Client function to delete a file
+func DeleteFile(filePath string) string{
+
+	// Call Datanodeservice delete function 
+	res:= datanodeservice.DeleteChunk(fileID)
+
+	// Call metaservice delete function
+	res,err:= metaservice.DeleteRequest(filePath)
+	if err!=nil{
+		return "failed to delete file"
+	}
+
+	return "file Deleted successfully"
+}
+
