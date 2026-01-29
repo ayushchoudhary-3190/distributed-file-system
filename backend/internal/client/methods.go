@@ -44,3 +44,14 @@ func DeleteFile(filePath string) string{
 	return "file Deleted successfully"
 }
 
+func ListFiles(owner string ,ownerID string) *ListFilesResponse{
+	res := metaservice.ListFiles(owner,ownerID)
+	if res.err != nil{
+		log.Fatal("failed to retrieve files")
+		return &ListFilesResponse{}
+	}
+
+	return res
+}
+
+
