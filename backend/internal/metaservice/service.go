@@ -1,45 +1,63 @@
 package metaservice
 
 import (
+	"context"
+
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/client"
+	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/metaservice"
+	pb "github.com/ayushchoudhary-3190/Distributed_file_system/pb"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-
-type NewFile_Params struct{
-	newFile *File_info
-	db 		*gorm.DB
+type MetaServer struct {
+	pb.UnimplementedMetaServiceServer
+	DB *gorm.DB
 }
 
-type File_info struct{
-	FileName   string
-	OwnerID    string
-	ChunkCount int64
-	ChunkArray []string
-	FileSize   int64
-}
+// function to add a new file to the metaservice table
+func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileRequest) (*pb.UploadFileResponse, string) {
+	//insert file metadata in metadata table
+	tx := s.DB.Begin()
 
-
-//  function to add a new file to the metaservice table
-func  CreateFile(newFileInfo *NewFile_Params) (uuid.UUID, error) {
-	fileID:= uuid.New()
-	err := newFileInfo.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Exec(`
-			INSERT INTO file_tables(fileid,file_name,ownerid,chunkcount,chunkarray,filesize) VALUES(?,?,?,?,?,?)
-		`,fileID, newFileInfo.newFile.FileName, newFileInfo.newFile.OwnerID, newFileInfo.newFile.ChunkCount, newFileInfo.newFile.ChunkArray, newFileInfo.newFile.FileSize)
-		if result.Error != nil {
-			return result.Error
-		}
-
-		return result.Error
-	})
-	if err != nil {
-		return  uuid.Nil,err
+	// Extract chunk IDs from request
+	chunkArray := make([]string, len(req.Chunks))
+	for i, chunk := range req.Chunks {
+		chunkArray[i] = chunk.Chunkid
 	}
-	return fileID, nil
+
+	file := metaservice.File_table{
+		FileID:     req.Fileid,
+		FileName:   req.Filename,
+		OwnerID:    req.Ownerid,
+		ChunkCount: req.Chunkcount,
+		ChunkArray: chunkArray,
+		FileSize:   req.Filesize,
+	}
+
+	// Create file record in database
+	if err := tx.Create(&file).Error; err != nil {
+		tx.Rollback()
+		response := &pb.UploadFileResponse{
+			Path:     req.Filename,
+			Response: "Failed to upload file metadata",
+		}
+		return response, err.Error()
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		response := &pb.UploadFileResponse{
+			Path:     req.Filename,
+			Response: "Failed to commit transaction",
+		}
+		return response, err.Error()
+	}
+
+	// Return success response
+	response := &pb.UploadFileResponse{
+		Path:     req.Filename,
+		Response: "File uploaded successfully",
+	}
+	return response, " "
 }
-
-
-
-

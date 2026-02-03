@@ -2,7 +2,7 @@ package metaservice
 
 
 type File_table struct{
-	FileID	  int64 `gorm:"primaryKey;autoIncrement"`
+	FileID	  int64 `gorm:"primaryKey;not null"`
 	FileName  string `gorm:"not null"`
 	OwnerID	  string `gorm:"unique;not null"`
 	ChunkCount int64  `gorm:"not null"`

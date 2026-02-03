@@ -31,9 +31,16 @@ service NodeControlService {
 
 
 message UploadFileRequest{
-    string filename = 1;
-    int64  size = 2;
-    repeated ChunkMetaData chunks = 3;
+    string fileid=1;
+    string filename =2;
+    string ownerid=3;
+    int64  chunkcount=4;
+    repeated ChunkId chunks = 5;
+    int64 filesize = 6;
+}
+
+message ChunkId{
+    string chunkid =1;
 }
 
 message UploadFileResponse{
@@ -58,11 +65,15 @@ message ListFilesRequest{
 
 
 message ListFilesResponse{
-    []string files = 1;
+    repeated FileListItem filename=1;
     string owner = 2;
     int64  owner_id =3;
     int64  count = 4;
     string err =5;
+}
+
+message FileListItem {
+  string filename = 1;
 }
 
 message GetFileRequest{
@@ -81,7 +92,6 @@ message GetFileResponse{
 message ChunkMetaData{
     string chunk_id = 1;
     int32  index = 2;
-    int64  size = 3;
 }
 
 message AllocateChunksRequest{

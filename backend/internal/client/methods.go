@@ -12,7 +12,6 @@ import (
 
 // Client function to add a new file 
 func AddFile(newFile *pb.UploadFileRequest) (string,string) {
-	file:=
 	fileID:= uuid.New()
 
 	// Allocate metadata to chunks
@@ -54,11 +53,11 @@ func ListFiles(owner string ,ownerID string) *ListFilesResponse{
 	return res
 }
 
-func GetFile(ownerID string, path string) *GetFileResponse{
+func GetFile(ownerID string, path string) *pb.GetFileResponse{
 	res:= metaservice.GetFile(ownerID,path)
 	if res.err != nil{
 		log.Fatal("failed to retrieve file")
-		return &GetFileResponse
+		return &pb.GetFileResponse{}
 	}
 	return res;
 }
