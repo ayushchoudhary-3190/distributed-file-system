@@ -67,7 +67,7 @@ message ListFilesRequest{
 message ListFilesResponse{
     repeated FileListItem filename=1;
     string owner = 2;
-    int64  owner_id =3;
+    string  owner_id =3;
     int64  count = 4;
     string err =5;
 }

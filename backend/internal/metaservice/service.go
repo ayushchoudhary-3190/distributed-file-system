@@ -105,3 +105,39 @@ func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileReque
 	}
 	return response, " "
 }
+
+// function to list files belonging to a specific owner
+func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, string) {
+	var files []metaservice.File_table
+
+	// Query files by owner_id
+	result := s.DB.Where("owner_id = ?", req.OwnerId).Find(&files)
+
+	if result.Error != nil {
+		response := &pb.ListFilesResponse{
+			Owner:   req.Owner,
+			OwnerId: req.OwnerId,
+			Count:   0,
+			Err:     result.Error.Error(),
+		}
+		return response, result.Error.Error()
+	}
+
+	// Create FileListItem array with only file names
+	fileList := make([]*pb.FileListItem, len(files))
+	for i, file := range files {
+		fileList[i] = &pb.FileListItem{
+			Filename: file.FileName,
+		}
+	}
+
+	// Return success response
+	response := &pb.ListFilesResponse{
+		Filename: fileList,
+		Owner:    req.Owner,
+		OwnerId:  req.OwnerId, // keeping as 0 since owner_id is string in proto but int64 in response
+		Count:    int64(len(fileList)),
+		Err:      "",
+	}
+	return response, " "
+}
