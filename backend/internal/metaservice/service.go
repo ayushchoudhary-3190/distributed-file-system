@@ -61,3 +61,47 @@ func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileReque
 	}
 	return response, " "
 }
+
+// function to delete a file from the metaservice table
+func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, string) {
+	// Start transaction
+	tx := s.DB.Begin()
+
+	// Find and delete the file with the given path
+	result := tx.Where("file_name = ?", req.Path).Delete(&metaservice.File_table{})
+
+	if result.Error != nil {
+		tx.Rollback()
+		response := &pb.DeleteFileResponse{
+			Message: "Failed to delete file",
+			Error:   result.Error.Error(),
+		}
+		return response, result.Error.Error()
+	}
+
+	// Check if any record was actually deleted
+	if result.RowsAffected == 0 {
+		tx.Rollback()
+		response := &pb.DeleteFileResponse{
+			Message: "File not found",
+			Error:   "No file exists with the given path",
+		}
+		return response, "No file exists with the given path"
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		response := &pb.DeleteFileResponse{
+			Message: "Failed to commit transaction",
+			Error:   err.Error(),
+		}
+		return response, err.Error()
+	}
+
+	// Return success response
+	response := &pb.DeleteFileResponse{
+		Message: "File deleted successfully",
+		Error:   "",
+	}
+	return response, " "
+}
