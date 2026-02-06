@@ -2,6 +2,7 @@ package metaservice
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/client"
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/metaservice"
@@ -13,6 +14,12 @@ import (
 type MetaServer struct {
 	pb.UnimplementedMetaServiceServer
 	DB *gorm.DB
+}
+
+// ChunkDataWithIndex holds chunk data along with its index for ordered reconstruction
+type ChunkDataWithIndex struct {
+	Index int32
+	Data  []byte
 }
 
 // function to add a new file to the metaservice table
@@ -135,9 +142,114 @@ func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (
 	response := &pb.ListFilesResponse{
 		Filename: fileList,
 		Owner:    req.Owner,
-		OwnerId:  req.OwnerId, // keeping as 0 since owner_id is string in proto but int64 in response
+		OwnerId:  req.OwnerId,
 		Count:    int64(len(fileList)),
 		Err:      "",
 	}
 	return response, " "
+}
+
+// function to get file by owner_id and path and reconstruct from chunks using parallel processing
+func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, string) {
+	var file metaservice.File_table
+
+	// Query file by owner_id and file_name (path)
+	result := s.DB.Where("owner_id = ? AND file_name = ?", req.OwnerId, req.Path).First(&file)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			response := &pb.GetFileResponse{
+				OwnerId:  req.OwnerId,
+				Path:     req.Path,
+				Size:     0,
+				Err:      "File not found",
+				FileData: nil,
+			}
+			return response, "File not found"
+		}
+		response := &pb.GetFileResponse{
+			OwnerId:  req.OwnerId,
+			Path:     req.Path,
+			Size:     0,
+			Err:      result.Error.Error(),
+			FileData: nil,
+		}
+		return response, result.Error.Error()
+	}
+
+	// Get chunk array from table
+	chunkIDs := file.ChunkArray
+
+	// Reconstruct file from chunks using parallel processing
+	fileData := s.reconstructFileFromChunks(chunkIDs)
+
+	// Return success response with reconstructed file data
+	response := &pb.GetFileResponse{
+		OwnerId:  file.OwnerID,
+		Path:     req.Path,
+		Size:     file.FileSize,
+		Err:      "",
+		FileData: fileData,
+	}
+	return response, nil
+}
+
+// reconstructFileFromChunks reconstructs file from chunks using parallel processing
+func (s *MetaServer) reconstructFileFromChunks(chunkIDs []string) []byte {
+	// Create channel with 128MB buffer (128 * 1024 * 1024 bytes)
+	chunkChannel := make(chan *ChunkDataWithIndex, 128*1024*1024)
+	var wg sync.WaitGroup
+
+	// Start workers for each chunk
+	for index, chunkID := range chunkIDs {
+		wg.Add(1)
+		go func(idx int, cid string) {
+			defer wg.Done()
+			// Read chunk from disk
+			chunkData := s.readChunk(cid)
+			// Add chunk to channel with index
+			chunkChannel <- &ChunkDataWithIndex{
+				Index: int32(idx),
+				Data:  chunkData,
+			}
+		}(index, chunkID)
+	}
+
+	// Start a goroutine to close channel when all workers are done
+	go func() {
+		wg.Wait()
+		close(chunkChannel)
+	}()
+
+	// Collect chunks from channel and reconstruct file in order
+	chunkMap := make(map[int32][]byte)
+	for chunkData := range chunkChannel {
+		chunkMap[chunkData.Index] = chunkData.Data
+	}
+
+	// Reconstruct file data in correct order
+	fileData := []byte{}
+	for i := 0; i < len(chunkIDs); i++ {
+		if chunkData, exists := chunkMap[int32(i)]; exists {
+			fileData = append(fileData, chunkData...)
+		}
+	}
+
+	return fileData
+}
+
+// readChunk function to read chunk from disk (placeholder implementation)
+func (s *MetaServer) readChunk(chunkID string) []byte {
+	// TODO: Implement actual chunk reading from disk
+	// For now, return empty bytes
+	// This will be implemented later
+	return []byte{}
+}
+
+// appendChunk function to append chunk data to file data (placeholder implementation)
+func (s *MetaServer) appendChunk(existingData []byte, newChunkData []byte) []byte {
+	// TODO: Implement proper chunk appending logic
+	// For now, simply append the new chunk data
+	// This will be implemented later
+	return append(existingData, newChunkData...)
 }

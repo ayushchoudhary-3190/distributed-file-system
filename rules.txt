@@ -1,0 +1,11 @@
+Rules for developing any project 
+1. Do not make changes to any file without asking my permission
+2. Use appropriate naming conventions according to the existing codebase
+3. Do not refactor anything wihtout permission
+4. If refactoring required always ask for permission first 
+5. Do not change whole file altogether , make small changes at one time
+6. When you are said to get context of the existing codebase then only read the code and don't start building anything even in build mode
+7. Always declare structs in global scope
+8. Always give a short summary of the changes you made in the codebase after executing something
+9. Perform the task given in the prompt only do not make any extra changes
+10. Do not change developing mode from plan to build or vice versa without permission
