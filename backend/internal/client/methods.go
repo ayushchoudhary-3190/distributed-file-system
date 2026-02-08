@@ -53,7 +53,7 @@ func ListFiles(owner string ,ownerID string) *ListFilesResponse{
 	return res
 }
 
-func GetFile(ownerID string, path string) *pb.GetFileResponse{
+func GetFile(ownerID string, path string) []byte{
 	res:= metaservice.GetFile(ownerID,path)
 	if res.err != nil{
 		log.Fatal("failed to retrieve file")

@@ -85,8 +85,7 @@ message GetFileResponse{
     string owner_id = 1;
     string path = 2;
     int64 size = 3;
-    repeated ChunkMetaData chunks = 4;
-    string err=5;
+    bytes file =4;
 }
 
 message ChunkMetaData{

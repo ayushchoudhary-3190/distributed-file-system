@@ -23,7 +23,7 @@ type ChunkDataWithIndex struct {
 }
 
 // function to add a new file to the metaservice table
-func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileRequest) (*pb.UploadFileResponse, string) {
+func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileRequest) (*pb.UploadFileResponse, error) {
 	//insert file metadata in metadata table
 	tx := s.DB.Begin()
 
@@ -49,7 +49,7 @@ func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileReque
 			Path:     req.Filename,
 			Response: "Failed to upload file metadata",
 		}
-		return response, err.Error()
+		return response, err
 	}
 
 	// Commit transaction
@@ -58,7 +58,7 @@ func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileReque
 			Path:     req.Filename,
 			Response: "Failed to commit transaction",
 		}
-		return response, err.Error()
+		return response, err
 	}
 
 	// Return success response
@@ -66,11 +66,11 @@ func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileReque
 		Path:     req.Filename,
 		Response: "File uploaded successfully",
 	}
-	return response, " "
+	return response, nil
 }
 
 // function to delete a file from the metaservice table
-func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, string) {
+func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, error) {
 	// Start transaction
 	tx := s.DB.Begin()
 
@@ -83,7 +83,7 @@ func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileReque
 			Message: "Failed to delete file",
 			Error:   result.Error.Error(),
 		}
-		return response, result.Error.Error()
+		return response, result.Error
 	}
 
 	// Check if any record was actually deleted
@@ -91,9 +91,9 @@ func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileReque
 		tx.Rollback()
 		response := &pb.DeleteFileResponse{
 			Message: "File not found",
-			Error:   "No file exists with the given path",
+			Error:   "file not deleted",
 		}
-		return response, "No file exists with the given path"
+		return response, nil
 	}
 
 	// Commit transaction
@@ -102,7 +102,7 @@ func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileReque
 			Message: "Failed to commit transaction",
 			Error:   err.Error(),
 		}
-		return response, err.Error()
+		return response, err
 	}
 
 	// Return success response
@@ -110,11 +110,11 @@ func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileReque
 		Message: "File deleted successfully",
 		Error:   "",
 	}
-	return response, " "
+	return response, nil
 }
 
 // function to list files belonging to a specific owner
-func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, string) {
+func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
 	var files []metaservice.File_table
 
 	// Query files by owner_id
@@ -127,7 +127,7 @@ func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (
 			Count:   0,
 			Err:     result.Error.Error(),
 		}
-		return response, result.Error.Error()
+		return response, result.Error
 	}
 
 	// Create FileListItem array with only file names
@@ -146,11 +146,11 @@ func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (
 		Count:    int64(len(fileList)),
 		Err:      "",
 	}
-	return response, " "
+	return response, nil
 }
 
-// function to get file by owner_id and path and reconstruct from chunks using parallel processing
-func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, string) {
+// function to get file by owner_id and path and reconstruct from chunks using new workflow
+func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, error) {
 	var file metaservice.File_table
 
 	// Query file by owner_id and file_name (path)
@@ -165,7 +165,7 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 				Err:      "File not found",
 				FileData: nil,
 			}
-			return response, "File not found"
+			return response, result.Error
 		}
 		response := &pb.GetFileResponse{
 			OwnerId:  req.OwnerId,
@@ -174,14 +174,14 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 			Err:      result.Error.Error(),
 			FileData: nil,
 		}
-		return response, result.Error.Error()
+		return response, result.Error
 	}
 
-	// Get chunk array from table
+	// Get chunkIDs array from table using ownerid and path from parameter
 	chunkIDs := file.ChunkArray
 
-	// Reconstruct file from chunks using parallel processing
-	fileData := s.reconstructFileFromChunks(chunkIDs)
+	// Use that chunkIDs array inside reconstructFileFromId function
+	fileData := s.reconstructFileFromId(chunkIDs)
 
 	// Return success response with reconstructed file data
 	response := &pb.GetFileResponse{
@@ -194,62 +194,45 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 	return response, nil
 }
 
-// reconstructFileFromChunks reconstructs file from chunks using parallel processing
-func (s *MetaServer) reconstructFileFromChunks(chunkIDs []string) []byte {
-	// Create channel with 128MB buffer (128 * 1024 * 1024 bytes)
-	chunkChannel := make(chan *ChunkDataWithIndex, 128*1024*1024)
-	var wg sync.WaitGroup
+// reconstructFileFromId reconstructs file from chunk IDs using location-based approach
+func (s *MetaServer) reconstructFileFromId(chunkIDs []string) []byte {
+	// Call getChunksLocation function to get locations for all chunk IDs
+	locations := s.getChunksLocation(chunkIDs)
 
-	// Start workers for each chunk
-	for index, chunkID := range chunkIDs {
-		wg.Add(1)
-		go func(idx int, cid string) {
-			defer wg.Done()
-			// Read chunk from disk
-			chunkData := s.readChunk(cid)
-			// Add chunk to channel with index
-			chunkChannel <- &ChunkDataWithIndex{
-				Index: int32(idx),
-				Data:  chunkData,
-			}
-		}(index, chunkID)
+	// Use these locations inside readChunks function for each address
+	return s.readChunks(chunkIDs, locations)
+}
+
+// getChunksLocation function to get locations for chunk IDs (placeholder implementation)
+func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string {
+	// TODO: Implement actual location retrieval
+	// This should return a map of chunkID -> location/address
+	// For now, return empty map
+	locations := make(map[string]string)
+	for _, chunkID := range chunkIDs {
+		locations[chunkID] = "" // placeholder
 	}
+	return locations
+}
 
-	// Start a goroutine to close channel when all workers are done
-	go func() {
-		wg.Wait()
-		close(chunkChannel)
-	}()
-
-	// Collect chunks from channel and reconstruct file in order
-	chunkMap := make(map[int32][]byte)
-	for chunkData := range chunkChannel {
-		chunkMap[chunkData.Index] = chunkData.Data
-	}
-
-	// Reconstruct file data in correct order
+// readChunks function to read chunks from their respective addresses and append them (placeholder implementation)
+func (s *MetaServer) readChunks(chunkIDs []string, locations map[string]string) []byte {
+	// TODO: Implement actual chunk reading from different addresses
+	// This should read chunks from their locations and append them in order
+	// For now, return empty bytes
 	fileData := []byte{}
-	for i := 0; i < len(chunkIDs); i++ {
-		if chunkData, exists := chunkMap[int32(i)]; exists {
-			fileData = append(fileData, chunkData...)
-		}
+	for _, chunkID := range chunkIDs {
+		// Read chunk from its location
+		chunkData := s.readChunkFromLocation(chunkID, locations[chunkID])
+		// Append chunk to file data
+		fileData = append(fileData, chunkData...)
 	}
-
 	return fileData
 }
 
-// readChunk function to read chunk from disk (placeholder implementation)
-func (s *MetaServer) readChunk(chunkID string) []byte {
-	// TODO: Implement actual chunk reading from disk
+// readChunkFromLocation function to read a chunk from a specific location (placeholder implementation)
+func (s *MetaServer) readChunkFromLocation(chunkID string, location string) []byte {
+	// TODO: Implement actual chunk reading from specific location
 	// For now, return empty bytes
-	// This will be implemented later
 	return []byte{}
-}
-
-// appendChunk function to append chunk data to file data (placeholder implementation)
-func (s *MetaServer) appendChunk(existingData []byte, newChunkData []byte) []byte {
-	// TODO: Implement proper chunk appending logic
-	// For now, simply append the new chunk data
-	// This will be implemented later
-	return append(existingData, newChunkData...)
 }
