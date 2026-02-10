@@ -305,7 +305,7 @@ var MetaService_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	DataNodeService_WriteChunk_FullMethodName  = "/dfs.v1.DataNodeService/WriteChunk"
-	DataNodeService_ReadChunk_FullMethodName   = "/dfs.v1.DataNodeService/ReadChunk"
+	DataNodeService_ReadChunks_FullMethodName  = "/dfs.v1.DataNodeService/ReadChunks"
 	DataNodeService_DeleteChunk_FullMethodName = "/dfs.v1.DataNodeService/DeleteChunk"
 )
 
@@ -314,7 +314,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataNodeServiceClient interface {
 	WriteChunk(ctx context.Context, opts ...grpc.CallOption) (DataNodeService_WriteChunkClient, error)
-	ReadChunk(ctx context.Context, in *ChunkReadRequest, opts ...grpc.CallOption) (DataNodeService_ReadChunkClient, error)
+	ReadChunks(ctx context.Context, in *ChunkReadRequest, opts ...grpc.CallOption) (DataNodeService_ReadChunksClient, error)
 	// DeleteChunk deletes a chunk from the data node
 	DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkResponse, error)
 }
@@ -362,13 +362,13 @@ func (x *dataNodeServiceWriteChunkClient) CloseAndRecv() (*ChunkWriteResponse, e
 	return m, nil
 }
 
-func (c *dataNodeServiceClient) ReadChunk(ctx context.Context, in *ChunkReadRequest, opts ...grpc.CallOption) (DataNodeService_ReadChunkClient, error) {
+func (c *dataNodeServiceClient) ReadChunks(ctx context.Context, in *ChunkReadRequest, opts ...grpc.CallOption) (DataNodeService_ReadChunksClient, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataNodeService_ServiceDesc.Streams[1], DataNodeService_ReadChunk_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataNodeService_ServiceDesc.Streams[1], DataNodeService_ReadChunks_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &dataNodeServiceReadChunkClient{ClientStream: stream}
+	x := &dataNodeServiceReadChunksClient{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -378,16 +378,16 @@ func (c *dataNodeServiceClient) ReadChunk(ctx context.Context, in *ChunkReadRequ
 	return x, nil
 }
 
-type DataNodeService_ReadChunkClient interface {
+type DataNodeService_ReadChunksClient interface {
 	Recv() (*ChunkReadResponse, error)
 	grpc.ClientStream
 }
 
-type dataNodeServiceReadChunkClient struct {
+type dataNodeServiceReadChunksClient struct {
 	grpc.ClientStream
 }
 
-func (x *dataNodeServiceReadChunkClient) Recv() (*ChunkReadResponse, error) {
+func (x *dataNodeServiceReadChunksClient) Recv() (*ChunkReadResponse, error) {
 	m := new(ChunkReadResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -410,7 +410,7 @@ func (c *dataNodeServiceClient) DeleteChunk(ctx context.Context, in *DeleteChunk
 // for forward compatibility
 type DataNodeServiceServer interface {
 	WriteChunk(DataNodeService_WriteChunkServer) error
-	ReadChunk(*ChunkReadRequest, DataNodeService_ReadChunkServer) error
+	ReadChunks(*ChunkReadRequest, DataNodeService_ReadChunksServer) error
 	// DeleteChunk deletes a chunk from the data node
 	DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error)
 	mustEmbedUnimplementedDataNodeServiceServer()
@@ -423,8 +423,8 @@ type UnimplementedDataNodeServiceServer struct {
 func (UnimplementedDataNodeServiceServer) WriteChunk(DataNodeService_WriteChunkServer) error {
 	return status.Errorf(codes.Unimplemented, "method WriteChunk not implemented")
 }
-func (UnimplementedDataNodeServiceServer) ReadChunk(*ChunkReadRequest, DataNodeService_ReadChunkServer) error {
-	return status.Errorf(codes.Unimplemented, "method ReadChunk not implemented")
+func (UnimplementedDataNodeServiceServer) ReadChunks(*ChunkReadRequest, DataNodeService_ReadChunksServer) error {
+	return status.Errorf(codes.Unimplemented, "method ReadChunks not implemented")
 }
 func (UnimplementedDataNodeServiceServer) DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteChunk not implemented")
@@ -468,24 +468,24 @@ func (x *dataNodeServiceWriteChunkServer) Recv() (*ChunkWriteRequest, error) {
 	return m, nil
 }
 
-func _DataNodeService_ReadChunk_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _DataNodeService_ReadChunks_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(ChunkReadRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DataNodeServiceServer).ReadChunk(m, &dataNodeServiceReadChunkServer{ServerStream: stream})
+	return srv.(DataNodeServiceServer).ReadChunks(m, &dataNodeServiceReadChunksServer{ServerStream: stream})
 }
 
-type DataNodeService_ReadChunkServer interface {
+type DataNodeService_ReadChunksServer interface {
 	Send(*ChunkReadResponse) error
 	grpc.ServerStream
 }
 
-type dataNodeServiceReadChunkServer struct {
+type dataNodeServiceReadChunksServer struct {
 	grpc.ServerStream
 }
 
-func (x *dataNodeServiceReadChunkServer) Send(m *ChunkReadResponse) error {
+func (x *dataNodeServiceReadChunksServer) Send(m *ChunkReadResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -526,8 +526,8 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "ReadChunk",
-			Handler:       _DataNodeService_ReadChunk_Handler,
+			StreamName:    "ReadChunks",
+			Handler:       _DataNodeService_ReadChunks_Handler,
 			ServerStreams: true,
 		},
 	},

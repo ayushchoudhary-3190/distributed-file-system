@@ -156,23 +156,13 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 	// Query file by owner_id and file_name (path)
 	result := s.DB.Where("owner_id = ? AND file_name = ?", req.OwnerId, req.Path).First(&file)
 
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			response := &pb.GetFileResponse{
-				OwnerId:  req.OwnerId,
-				Path:     req.Path,
-				Size:     0,
-				Err:      "File not found",
-				FileData: nil,
-			}
-			return response, result.Error
-		}
+	if result.Error != nil { 
 		response := &pb.GetFileResponse{
 			OwnerId:  req.OwnerId,
 			Path:     req.Path,
 			Size:     0,
 			Err:      result.Error.Error(),
-			FileData: nil,
+			File: nil,
 		}
 		return response, result.Error
 	}
@@ -188,14 +178,13 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 		OwnerId:  file.OwnerID,
 		Path:     req.Path,
 		Size:     file.FileSize,
-		Err:      "",
-		FileData: fileData,
+		File: fileData,
 	}
 	return response, nil
 }
 
 // reconstructFileFromId reconstructs file from chunk IDs using location-based approach
-func (s *MetaServer) reconstructFileFromId(chunkIDs []string) []byte {
+func (s *MetaServer) reconstructFileFromId(chunkIDs []string) []byte { //// metaservice fucntion
 	// Call getChunksLocation function to get locations for all chunk IDs
 	locations := s.getChunksLocation(chunkIDs)
 
@@ -204,7 +193,7 @@ func (s *MetaServer) reconstructFileFromId(chunkIDs []string) []byte {
 }
 
 // getChunksLocation function to get locations for chunk IDs (placeholder implementation)
-func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string {
+func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string {  ////metaservice fucntion
 	// TODO: Implement actual location retrieval
 	// This should return a map of chunkID -> location/address
 	// For now, return empty map
@@ -216,22 +205,22 @@ func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string {
 }
 
 // readChunks function to read chunks from their respective addresses and append them (placeholder implementation)
-func (s *MetaServer) readChunks(chunkIDs []string, locations map[string]string) []byte {
+//func (s *MetaServer) readChunks(chunkIDs []string, locations map[string]string) []byte {  /////datanodeservice function
 	// TODO: Implement actual chunk reading from different addresses
 	// This should read chunks from their locations and append them in order
 	// For now, return empty bytes
-	fileData := []byte{}
-	for _, chunkID := range chunkIDs {
-		// Read chunk from its location
-		chunkData := s.readChunkFromLocation(chunkID, locations[chunkID])
-		// Append chunk to file data
-		fileData = append(fileData, chunkData...)
-	}
-	return fileData
-}
+//	fileData := []byte{}
+//	for _, chunkID := range chunkIDs {
+//		// Read chunk from its location
+//		chunkData := s.readChunkFromLocation(chunkID, locations[chunkID])
+//		// Append chunk to file data
+//		fileData = append(fileData, chunkData...)
+//	}
+//	return fileData
+//}
 
 // readChunkFromLocation function to read a chunk from a specific location (placeholder implementation)
-func (s *MetaServer) readChunkFromLocation(chunkID string, location string) []byte {
+func (s *MetaServer) readChunkFromLocation(chunkID string, location string) []byte { ////datanodeservice function
 	// TODO: Implement actual chunk reading from specific location
 	// For now, return empty bytes
 	return []byte{}
