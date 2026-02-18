@@ -2,6 +2,7 @@ package metaservice
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/client"
@@ -25,7 +26,7 @@ type ChunkDataWithIndex struct {
 }
 
 // function to add a new file to the metaservice table
-func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileRequest) (*pb.UploadFileResponse, error) {
+func (s *MetaServer) UploadRequest(ctx context.Context, req *pb.UploadFileRequest) (*pb.UploadFileResponse, error) {
 	//insert file metadata in metadata table
 	tx := s.DB.Begin()
 
@@ -72,7 +73,7 @@ func (s *MetaServer) UploadRequest(ctx *context.Context, req *pb.UploadFileReque
 }
 
 // function to delete a file from the metaservice table
-func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, error) {
+func (s *MetaServer) DeleteRequest(ctx context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, error) {
 	// Start transaction
 	tx := s.DB.Begin()
 
@@ -116,7 +117,7 @@ func (s *MetaServer) DeleteRequest(ctx *context.Context, req *pb.DeleteFileReque
 }
 
 // function to list files belonging to a specific owner
-func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
+func (s *MetaServer) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
 	var files []metaservice.File_table
 
 	// Query files by owner_id
@@ -152,7 +153,7 @@ func (s *MetaServer) ListFiles(ctx *context.Context, req *pb.ListFilesRequest) (
 }
 
 // function to get file by owner_id and path and reconstruct from chunks using new workflow
-func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, error) {
+func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, error) {
 	var file metaservice.File_table
 
 	// Query file by owner_id and file_name (path)
@@ -163,7 +164,6 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 			OwnerId: req.OwnerId,
 			Path:    req.Path,
 			Size:    0,
-			Err:     result.Error.Error(),
 			File:    nil,
 		}
 		return response, result.Error
@@ -173,7 +173,18 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 	chunkIDs := file.ChunkArray
 
 	// Use that chunkIDs array inside reconstructFileFromId function
-	fileData := s.reconstructFileFromId(chunkIDs)
+	fileData ,err:= s.reconstructFileFromId(chunkIDs)
+
+	if err!=nil{
+		log.Fatal("failed to reconstruct file from chunk ids")
+		response:= &pb.GetFileResponse{
+			OwnerId: req.OwnerId,
+			Path: req.Path,
+			Size: 0,
+			File: nil,
+		}
+		return response , err
+	}
 
 	// Return success response with reconstructed file data
 	response := &pb.GetFileResponse{
@@ -207,14 +218,21 @@ func (s *MetaServer) reconstructFileFromId(chunkIDs []string) ([]byte, error) { 
 			return fileData, err // Return error from response
 		}
 
-		// Receive response from stream
-		resp, err := stream.Recv()
-		if err != nil {
-			return fileData, err
-		}
+		// Receive ALL responses from stream in a loop
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				break // Stream ended
+			}
 
-		// Append only the DATA part from response
-		fileData = append(fileData, resp.Data...)
+			// Append only the DATA part from response
+			fileData = append(fileData, resp.Data...)
+
+			// Check for EOF - if true, no more data for this chunk
+			if resp.Eof {
+				break
+			}
+		}
 	}
 
 	return fileData, nil // Return data bytes and nil error on success

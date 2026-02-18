@@ -137,6 +137,7 @@ message ChunkReadRequest{
     string chunk_id = 1;
     uint64 offset = 2;
     uint64 length = 3;
+    repeated ChunkLocation locations=4;
 }
 
 message ChunkReadResponse{
