@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/client"
+	datanodeservice "github.com/ayushchoudhary-3190/Distributed_file_system/internal/datanodes"
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/metaservice"
 	pb "github.com/ayushchoudhary-3190/Distributed_file_system/pb"
 	"github.com/google/uuid"
@@ -13,7 +14,8 @@ import (
 
 type MetaServer struct {
 	pb.UnimplementedMetaServiceServer
-	DB *gorm.DB
+	DB             *gorm.DB
+	dataNodeClient pb.DataNodeServiceClient
 }
 
 // ChunkDataWithIndex holds chunk data along with its index for ordered reconstruction
@@ -156,13 +158,13 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 	// Query file by owner_id and file_name (path)
 	result := s.DB.Where("owner_id = ? AND file_name = ?", req.OwnerId, req.Path).First(&file)
 
-	if result.Error != nil { 
+	if result.Error != nil {
 		response := &pb.GetFileResponse{
-			OwnerId:  req.OwnerId,
-			Path:     req.Path,
-			Size:     0,
-			Err:      result.Error.Error(),
-			File: nil,
+			OwnerId: req.OwnerId,
+			Path:    req.Path,
+			Size:    0,
+			Err:     result.Error.Error(),
+			File:    nil,
 		}
 		return response, result.Error
 	}
@@ -175,25 +177,51 @@ func (s *MetaServer) GetFile(ctx *context.Context, req *pb.GetFileRequest) (*pb.
 
 	// Return success response with reconstructed file data
 	response := &pb.GetFileResponse{
-		OwnerId:  file.OwnerID,
-		Path:     req.Path,
-		Size:     file.FileSize,
-		File: fileData,
+		OwnerId: file.OwnerID,
+		Path:    req.Path,
+		Size:    file.FileSize,
+		File:    fileData,
 	}
 	return response, nil
 }
 
 // reconstructFileFromId reconstructs file from chunk IDs using location-based approach
-func (s *MetaServer) reconstructFileFromId(chunkIDs []string) []byte { //// metaservice fucntion
-	// Call getChunksLocation function to get locations for all chunk IDs
+func (s *MetaServer) reconstructFileFromId(chunkIDs []string) ([]byte, error) { //// metaservice function
+	// Get locations for chunk IDs
 	locations := s.getChunksLocation(chunkIDs)
 
-	// Use these locations inside readChunks function for each address
-	return s.readChunks(chunkIDs, locations)
+	var fileData []byte
+
+	// For each chunkID, call ReadChunks via DataNode client
+	for _, chunkID := range chunkIDs {
+		// Prepare gRPC request
+		req := &pb.ChunkReadRequest{
+			ChunkId: chunkID,
+			Offset:  0,
+			Length:  65536, // appropriate chunk size
+		}
+
+		// Call DataNode via client - this is the correct way
+		stream, err := s.dataNodeClient.ReadChunks(context.Background(), req)
+		if err != nil {
+			return fileData, err // Return error from response
+		}
+
+		// Receive response from stream
+		resp, err := stream.Recv()
+		if err != nil {
+			return fileData, err
+		}
+
+		// Append only the DATA part from response
+		fileData = append(fileData, resp.Data...)
+	}
+
+	return fileData, nil // Return data bytes and nil error on success
 }
 
 // getChunksLocation function to get locations for chunk IDs (placeholder implementation)
-func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string {  ////metaservice fucntion
+func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string { ////metaservice fucntion
 	// TODO: Implement actual location retrieval
 	// This should return a map of chunkID -> location/address
 	// For now, return empty map
@@ -206,9 +234,9 @@ func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string {  /
 
 // readChunks function to read chunks from their respective addresses and append them (placeholder implementation)
 //func (s *MetaServer) readChunks(chunkIDs []string, locations map[string]string) []byte {  /////datanodeservice function
-	// TODO: Implement actual chunk reading from different addresses
-	// This should read chunks from their locations and append them in order
-	// For now, return empty bytes
+// TODO: Implement actual chunk reading from different addresses
+// This should read chunks from their locations and append them in order
+// For now, return empty bytes
 //	fileData := []byte{}
 //	for _, chunkID := range chunkIDs {
 //		// Read chunk from its location
