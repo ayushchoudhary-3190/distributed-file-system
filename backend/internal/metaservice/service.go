@@ -2,6 +2,7 @@ package metaservice
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 
@@ -197,9 +198,9 @@ func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.G
 }
 
 // reconstructFileFromId reconstructs file from chunk IDs using location-based approach
-func (s *MetaServer) reconstructFileFromId(chunkIDs []string) ([]byte, error) { //// metaservice function
+func (s *MetaServer) reconstructFileFromId(chunkIDs *pb.GetChunkLocationRequest) ([]byte, error) { //// metaservice function
 	// Get locations for chunk IDs
-	locations := s.getChunksLocation(chunkIDs)
+	locations, err := s.GetChunksLocations(context.Background(), chunkIDs)
 
 	var fileData []byte
 
@@ -236,25 +237,74 @@ func (s *MetaServer) reconstructFileFromId(chunkIDs []string) ([]byte, error) { 
 	return fileData, nil // Return data bytes and nil error on success
 }
 
-// getChunksLocation function to get locations for chunk IDs (placeholder implementation)
-func (s *MetaServer) getChunksLocation(chunkIDs []string) []*pb.ChunkLocation { ////metaservice function
-	// TODO: Implement actual location retrieval from database
-	// This should return []*pb.ChunkLocation containing chunk_id, index, and replicas
-	// For now, return placeholder
-	var locations []*pb.ChunkLocation
-	for i, chunkID := range chunkIDs {
-		locations = append(locations, &pb.ChunkLocation{
-			ChunkId: chunkID,
-			Index:   int32(i),
-			Replicas: []*pb.DataNodeEndpoint{
-				{
-					NodeId:  "node1",
-					Address: "localhost:50051",
-				},
-			},
-		})
+// getChunksLocation is a gRPC function that returns chunk locations for a file
+// 1. Takes file_id as string parameter
+// 2. Scans metaservice table (File_table) for that file_id
+// 3. Gets the ChunkArray containing all chunkIDs
+// 4. For each chunkID, calls getChunkAddress to get node information
+// 5. Returns structured data using ChunkLocation and DataNodeEndpoint from proto
+func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLocationRequest) (*pb.GetChunkLocationResponse, error) { //// metaservice gRPC function
+	// Step 1: Scan metaservice table for file_id
+	var file metaservice.File_table
+	result := s.DB.Where("file_id = ?", req.FileId).First(&file)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return &pb.GetChunkLocationResponse{
+				Locs: nil,
+			}, fmt.Errorf("file not found: %s", req.FileId)
+		}
+		return &pb.GetChunkLocationResponse{
+			Locs: nil,
+		}, result.Error
 	}
-	return locations
+
+	// Step 2: Get the chunk array containing all chunkIDs
+	chunkIDs := file.ChunkArray
+
+	// Step 3: For each chunkID, call getChunkAddress to get node information
+	var chunkLocations []*pb.ChunkLocation
+
+	for i, chunkID := range chunkIDs {
+		// Get chunk addresses (node IDs and addresses) for this chunk
+		nodeEndpoints := s.getChunkAddress(chunkID)
+
+		// Step 4: Structure the data according to ChunkLocation proto
+		chunkLocation := &pb.ChunkLocation{
+			ChunkId:  chunkID,
+			Index:    int32(i),
+			Replicas: nodeEndpoints,
+		}
+
+		chunkLocations = append(chunkLocations, chunkLocation)
+	}
+
+	// Step 5: Return structured data
+	return &pb.GetChunkLocationResponse{
+		Locs: chunkLocations,
+	}, nil
+}
+
+// getChunkAddress is a helper function that returns array of node endpoints for a chunk
+// Returns []*pb.DataNodeEndpoint containing node_id and address
+func (s *MetaServer) getChunkAddress(chunkID string) []*pb.DataNodeEndpoint { //// helper function
+	// TODO: Implement actual lookup from database
+	// Should query Chunk_table and Node_table to get where this chunk is stored
+	// For now, return placeholder
+	var endpoints []*pb.DataNodeEndpoint
+
+	// Placeholder - query database to get actual node information
+	// This should:
+	// 1. Query Chunk_table to find which nodes have this chunk
+	// 2. For each node, query Node_table to get the address
+	// 3. Return array of DataNodeEndpoint
+
+	endpoints = append(endpoints, &pb.DataNodeEndpoint{
+		NodeId:  "node1",
+		Address: "localhost:50051",
+	})
+
+	return endpoints
 }
 
 // readChunks function to read chunks from their respective addresses and append them (placeholder implementation)
@@ -271,10 +321,3 @@ func (s *MetaServer) getChunksLocation(chunkIDs []string) []*pb.ChunkLocation { 
 //	}
 //	return fileData
 //}
-
-// readChunkFromLocation function to read a chunk from a specific location (placeholder implementation)
-func (s *MetaServer) readChunkFromLocation(chunkID string, location string) []byte { ////datanodeservice function
-	// TODO: Implement actual chunk reading from specific location
-	// For now, return empty bytes
-	return []byte{}
-}
