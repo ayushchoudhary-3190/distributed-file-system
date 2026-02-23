@@ -12,6 +12,10 @@ type datanodeserver struct {
 	pb.UnimplementedDataNodeServiceServer
 }
 
+func (dns *datanodeserver) WriteChunk(ctx context.Context,req *pb.ChunkWriteRequest) (*pb.ChunkWriteResponse,error){
+	
+}
+
 func (dns *datanodeserver) ReadChunks(ctx context.Context, req *pb.ChunkReadRequest) (*pb.ChunkReadResponse, error) {
 	// Handle edge case: empty chunk_id
 	if req.ChunkId == "" {

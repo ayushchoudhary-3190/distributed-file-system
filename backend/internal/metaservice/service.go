@@ -173,17 +173,17 @@ func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.G
 	chunkIDs := file.ChunkArray
 
 	// Use that chunkIDs array inside reconstructFileFromId function
-	fileData ,err:= s.reconstructFileFromId(chunkIDs)
+	fileData, err := s.reconstructFileFromId(chunkIDs)
 
-	if err!=nil{
+	if err != nil {
 		log.Fatal("failed to reconstruct file from chunk ids")
-		response:= &pb.GetFileResponse{
+		response := &pb.GetFileResponse{
 			OwnerId: req.OwnerId,
-			Path: req.Path,
-			Size: 0,
-			File: nil,
+			Path:    req.Path,
+			Size:    0,
+			File:    nil,
 		}
-		return response , err
+		return response, err
 	}
 
 	// Return success response with reconstructed file data
@@ -203,35 +203,33 @@ func (s *MetaServer) reconstructFileFromId(chunkIDs []string) ([]byte, error) { 
 
 	var fileData []byte
 
-	// For each chunkID, call ReadChunks via DataNode client
-	for _, chunkID := range chunkIDs {
-		// Prepare gRPC request
-		req := &pb.ChunkReadRequest{
-			ChunkId: chunkID,
-			Offset:  0,
-			Length:  65536, // appropriate chunk size
-		}
+	// Prepare gRPC request with locations
+	req := &pb.ChunkReadRequest{
+		ChunkId:   "",
+		Offset:    0,
+		Length:    65536,
+		Locations: locations,
+	}
 
-		// Call DataNode via client - this is the correct way
-		stream, err := s.dataNodeClient.ReadChunks(context.Background(), req)
+	// Call DataNode via client using the existing dataNodeClient
+	stream, err := s.dataNodeClient.ReadChunks(context.Background(), req)
+	if err != nil {
+		return fileData, err
+	}
+
+	// Receive ALL responses from stream in a loop
+	for {
+		resp, err := stream.Recv()
 		if err != nil {
-			return fileData, err // Return error from response
+			break // Stream ended
 		}
 
-		// Receive ALL responses from stream in a loop
-		for {
-			resp, err := stream.Recv()
-			if err != nil {
-				break // Stream ended
-			}
+		// Append only the DATA part from response
+		fileData = append(fileData, resp.Data...)
 
-			// Append only the DATA part from response
-			fileData = append(fileData, resp.Data...)
-
-			// Check for EOF - if true, no more data for this chunk
-			if resp.Eof {
-				break
-			}
+		// Check for EOF - if true, no more data
+		if resp.Eof {
+			break
 		}
 	}
 
@@ -239,13 +237,22 @@ func (s *MetaServer) reconstructFileFromId(chunkIDs []string) ([]byte, error) { 
 }
 
 // getChunksLocation function to get locations for chunk IDs (placeholder implementation)
-func (s *MetaServer) getChunksLocation(chunkIDs []string) map[string]string { ////metaservice fucntion
-	// TODO: Implement actual location retrieval
-	// This should return a map of chunkID -> location/address
-	// For now, return empty map
-	locations := make(map[string]string)
-	for _, chunkID := range chunkIDs {
-		locations[chunkID] = "" // placeholder
+func (s *MetaServer) getChunksLocation(chunkIDs []string) []*pb.ChunkLocation { ////metaservice function
+	// TODO: Implement actual location retrieval from database
+	// This should return []*pb.ChunkLocation containing chunk_id, index, and replicas
+	// For now, return placeholder
+	var locations []*pb.ChunkLocation
+	for i, chunkID := range chunkIDs {
+		locations = append(locations, &pb.ChunkLocation{
+			ChunkId: chunkID,
+			Index:   int32(i),
+			Replicas: []*pb.DataNodeEndpoint{
+				{
+					NodeId:  "node1",
+					Address: "localhost:50051",
+				},
+			},
+		})
 	}
 	return locations
 }
