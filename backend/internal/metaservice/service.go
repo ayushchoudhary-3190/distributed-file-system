@@ -267,7 +267,7 @@ func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLoc
 
 	for i, chunkID := range chunkIDs {
 		// Get chunk addresses (node IDs and addresses) for this chunk
-		nodeEndpoints := s.getChunkAddress(chunkID)
+		nodeEndpoints := s.dataNodeClient.getChunkAddress(chunkID)
 
 		// Step 4: Structure the data according to ChunkLocation proto
 		chunkLocation := &pb.ChunkLocation{
@@ -285,27 +285,6 @@ func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLoc
 	}, nil
 }
 
-// getChunkAddress is a helper function that returns array of node endpoints for a chunk
-// Returns []*pb.DataNodeEndpoint containing node_id and address
-func (s *MetaServer) getChunkAddress(chunkID string) []*pb.DataNodeEndpoint { //// helper function
-	// TODO: Implement actual lookup from database
-	// Should query Chunk_table and Node_table to get where this chunk is stored
-	// For now, return placeholder
-	var endpoints []*pb.DataNodeEndpoint
-
-	// Placeholder - query database to get actual node information
-	// This should:
-	// 1. Query Chunk_table to find which nodes have this chunk
-	// 2. For each node, query Node_table to get the address
-	// 3. Return array of DataNodeEndpoint
-
-	endpoints = append(endpoints, &pb.DataNodeEndpoint{
-		NodeId:  "node1",
-		Address: "localhost:50051",
-	})
-
-	return endpoints
-}
 
 // readChunks function to read chunks from their respective addresses and append them (placeholder implementation)
 //func (s *MetaServer) readChunks(chunkIDs []string, locations map[string]string) []byte {  /////datanodeservice function

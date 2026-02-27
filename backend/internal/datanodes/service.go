@@ -12,8 +12,8 @@ type datanodeserver struct {
 	pb.UnimplementedDataNodeServiceServer
 }
 
-func (dns *datanodeserver) WriteChunk(ctx context.Context,req *pb.ChunkWriteRequest) (*pb.ChunkWriteResponse,error){
-	
+func (dns *datanodeserver) WriteChunk(ctx context.Context, req *pb.ChunkWriteRequest) (*pb.ChunkWriteResponse, error) {
+
 }
 
 func (dns *datanodeserver) ReadChunks(ctx context.Context, req *pb.ChunkReadRequest) (*pb.ChunkReadResponse, error) {
@@ -83,4 +83,35 @@ func (dns *datanodeserver) readChunkFromStorage(chunkID string) ([]byte, error) 
 	// This should read chunk data from disk, database, or other storage
 	// For now, return sample data
 	return []byte("sample chunk data for " + chunkID), nil
+}
+
+// getChunkAddress is a helper function that returns array of node endpoints for a chunk
+// Returns []*pb.DataNodeEndpoint containing node_id and address
+func (dns *datanodeserver) getChunkAddress(chunkID string) []*pb.DataNodeEndpoint { //// helper function
+	var endpoints []*pb.DataNodeEndpoint
+
+	// Step 1: Query Chunk_table to find which nodes have this chunk
+	var chunk Chunk_table
+	result := dns.DB.Where("chunk_id = ?", chunkID).First(&chunk)
+	if result.Error != nil {
+		// If chunk not found, return empty endpoints
+		return endpoints
+	}
+
+	// Step 2: For each nodeID that has this chunk, query Node_table to get address
+	for _, nodeID := range chunk.NodeID {
+		var node Node_table
+		nodeResult := dns.DB.Where("node_id = ?", nodeID).First(&node)
+		if nodeResult.Error != nil {
+			continue // Skip if node not found
+		}
+
+		// Step 3: Add to endpoints array
+		endpoints = append(endpoints, &pb.DataNodeEndpoint{
+			NodeId:  node.NodeID,
+			Address: node.BaseDir,
+		})
+	}
+
+	return endpoints
 }
