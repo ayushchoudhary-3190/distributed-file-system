@@ -85,14 +85,15 @@ func (dns *datanodeserver) readChunkFromStorage(chunkID string) ([]byte, error) 
 	return []byte("sample chunk data for " + chunkID), nil
 }
 
-// getChunkAddress is a helper function that returns array of node endpoints for a chunk
+// getChunkAddress is a package-level helper function that returns array of node endpoints for a chunk
 // Returns []*pb.DataNodeEndpoint containing node_id and address
-func (dns *datanodeserver) getChunkAddress(chunkID string) []*pb.DataNodeEndpoint { //// helper function
+// Accepts *gorm.DB as parameter to query the database
+func GetChunkAddress(db *gorm.DB, chunkID string) []*pb.DataNodeEndpoint { //// helper function
 	var endpoints []*pb.DataNodeEndpoint
 
 	// Step 1: Query Chunk_table to find which nodes have this chunk
 	var chunk Chunk_table
-	result := dns.DB.Where("chunk_id = ?", chunkID).First(&chunk)
+	result := db.Where("chunk_id = ?", chunkID).First(&chunk)
 	if result.Error != nil {
 		// If chunk not found, return empty endpoints
 		return endpoints
@@ -101,7 +102,7 @@ func (dns *datanodeserver) getChunkAddress(chunkID string) []*pb.DataNodeEndpoin
 	// Step 2: For each nodeID that has this chunk, query Node_table to get address
 	for _, nodeID := range chunk.NodeID {
 		var node Node_table
-		nodeResult := dns.DB.Where("node_id = ?", nodeID).First(&node)
+		nodeResult := db.Where("node_id = ?", nodeID).First(&node)
 		if nodeResult.Error != nil {
 			continue // Skip if node not found
 		}

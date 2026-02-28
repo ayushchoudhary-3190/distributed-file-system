@@ -267,7 +267,8 @@ func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLoc
 
 	for i, chunkID := range chunkIDs {
 		// Get chunk addresses (node IDs and addresses) for this chunk
-		nodeEndpoints := s.dataNodeClient.getChunkAddress(chunkID)
+		// Using datanodeservice package to call getChunkAddress helper
+		nodeEndpoints := datanodeservice.GetChunkAddress(s.DB, chunkID)
 
 		// Step 4: Structure the data according to ChunkLocation proto
 		chunkLocation := &pb.ChunkLocation{
@@ -286,17 +287,3 @@ func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLoc
 }
 
 
-// readChunks function to read chunks from their respective addresses and append them (placeholder implementation)
-//func (s *MetaServer) readChunks(chunkIDs []string, locations map[string]string) []byte {  /////datanodeservice function
-// TODO: Implement actual chunk reading from different addresses
-// This should read chunks from their locations and append them in order
-// For now, return empty bytes
-//	fileData := []byte{}
-//	for _, chunkID := range chunkIDs {
-//		// Read chunk from its location
-//		chunkData := s.readChunkFromLocation(chunkID, locations[chunkID])
-//		// Append chunk to file data
-//		fileData = append(fileData, chunkData...)
-//	}
-//	return fileData
-//}

@@ -160,12 +160,17 @@ message HeartbeatRequest{
     int64 used_bytes =4;
 }
 
-message HeartbeatResponse{}
+message HeartbeatResponse{
+    bool status = 1;
+    string message = 2;
+}
 
 message ReportChunksRequest{
     string node_id =1;
     repeated string chunk_ids =2;
 }
 
-message ReportChunksResponse{}
+message ReportChunksResponse{
+    repeated string missing_chunk_ids = 1;
+}
 
