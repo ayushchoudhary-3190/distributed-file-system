@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/client"
 	datanodeservice "github.com/ayushchoudhary-3190/Distributed_file_system/internal/datanodes"
@@ -16,8 +18,9 @@ import (
 
 type MetaServer struct {
 	pb.UnimplementedMetaServiceServer
-	DB             *gorm.DB
-	dataNodeClient pb.DataNodeServiceClient
+	DB                *gorm.DB
+	dataNodeClient    pb.DataNodeServiceClient
+	nodeControlClient pb.NodeControlServiceClient
 }
 
 // ChunkDataWithIndex holds chunk data along with its index for ordered reconstruction
@@ -170,11 +173,8 @@ func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.G
 		return response, result.Error
 	}
 
-	// Get chunkIDs array from table using ownerid and path from parameter
-	chunkIDs := file.ChunkArray
-
-	// Use that chunkIDs array inside reconstructFileFromId function
-	fileData, err := s.reconstructFileFromId(chunkIDs)
+	// Use fileID inside reconstructFileFromId function
+	fileData, err := s.reconstructFileFromId(file.FileID)
 
 	if err != nil {
 		log.Fatal("failed to reconstruct file from chunk ids")
@@ -198,43 +198,64 @@ func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.G
 }
 
 // reconstructFileFromId reconstructs file from chunk IDs using location-based approach
-func (s *MetaServer) reconstructFileFromId(chunkIDs *pb.GetChunkLocationRequest) ([]byte, error) { //// metaservice function
-	// Get locations for chunk IDs
-	locations, err := s.GetChunksLocations(context.Background(), chunkIDs)
-
+func (s *MetaServer) reconstructFileFromId(fileID string) ([]byte, error) { //// metaservice function
 	var fileData []byte
 
-	// Prepare gRPC request with locations
-	req := &pb.ChunkReadRequest{
-		ChunkId:   "",
-		Offset:    0,
-		Length:    65536,
-		Locations: locations,
-	}
-
-	// Call DataNode via client using the existing dataNodeClient
-	stream, err := s.dataNodeClient.ReadChunks(context.Background(), req)
+	// Step 1: Call getChunkLocation with fileID to get ChunkLocation array
+	locationResp, err := s.GetChunksLocations(context.Background(), &pb.GetChunkLocationRequest{
+		FileId: fileID,
+	})
 	if err != nil {
 		return fileData, err
 	}
 
-	// Receive ALL responses from stream in a loop
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			break // Stream ended
+	// Step 2: Sort chunks by Index to ensure correct order
+	sort.Slice(locationResp.Locs, func(i, j int) bool {
+		return locationResp.Locs[i].Index < locationResp.Locs[j].Index
+	})
+
+	// Step 3: For each ChunkLocation, check heartbeat and read
+	for _, chunkLocation := range locationResp.Locs {
+		chunkRead := false
+
+		// Step 4: Try each replica until find active DataNode
+		for _, replica := range chunkLocation.Replicas {
+			// Check if DataNode is active using Heartbeat with 0.5s timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+
+			heartbeatResp, err := s.nodeControlClient.Heartbeat(ctx, &pb.HeartbeatRequest{
+				NodeId:  replica.NodeId,
+				Address: replica.Address,
+			})
+
+			if err == nil && heartbeatResp.Status {
+				// DataNode is active - read chunk
+				req := &pb.ChunkReadRequest{
+					ChunkId: chunkLocation.ChunkId,
+					Offset:  0,
+					Length:  33554432, // 32 MB
+				}
+
+				resp, err := s.dataNodeClient.ReadChunk(context.Background(), req)
+				if err == nil {
+					fileData = append(fileData, resp.Data...)
+
+					if resp.Eof {
+						chunkRead = true
+						break
+					}
+				}
+			}
 		}
 
-		// Append only the DATA part from response
-		fileData = append(fileData, resp.Data...)
-
-		// Check for EOF - if true, no more data
-		if resp.Eof {
-			break
+		// Step 5: If chunk couldn't be read from any replica, fail completely
+		if !chunkRead {
+			return fileData, fmt.Errorf("failed to read chunk %s from any replica", chunkLocation.ChunkId)
 		}
 	}
 
-	return fileData, nil // Return data bytes and nil error on success
+	return fileData, nil
 }
 
 // getChunksLocation is a gRPC function that returns chunk locations for a file
@@ -285,5 +306,3 @@ func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLoc
 		Locs: chunkLocations,
 	}, nil
 }
-
-

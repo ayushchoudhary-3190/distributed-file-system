@@ -19,7 +19,7 @@ service MetaService{
 
 service DataNodeService {
   rpc WriteChunk(stream ChunkWriteRequest) returns (ChunkWriteResponse);
-  rpc ReadChunks(ChunkReadRequest) returns (stream ChunkReadResponse);
+  rpc ReadChunk(ChunkReadRequest) returns (ChunkReadResponse);
   // DeleteChunk deletes a chunk from the data node
   rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
 }
@@ -105,7 +105,7 @@ message AllocateChunksResponse{
 }
 
 message GetChunkLocationRequest{
-    string file_id = 1;
+    repeated string chunkids = 1;
 }
 
 message GetChunkLocationResponse{
@@ -137,7 +137,6 @@ message ChunkReadRequest{
     string chunk_id = 1;
     uint64 offset = 2;
     uint64 length = 3;
-    repeated ChunkLocation locations=4;
 }
 
 message ChunkReadResponse{
