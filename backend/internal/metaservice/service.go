@@ -197,62 +197,98 @@ func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.G
 	return response, nil
 }
 
+// ChunkResult holds the result of reading a chunk with its index for ordering
+type ChunkResult struct {
+	Index int
+	Data  []byte
+	Error error
+}
+
 // reconstructFileFromId reconstructs file from chunk IDs using location-based approach
 func (s *MetaServer) reconstructFileFromId(fileID string) ([]byte, error) { //// metaservice function
-	var fileData []byte
-
 	// Step 1: Call getChunkLocation with fileID to get ChunkLocation array
 	locationResp, err := s.GetChunksLocations(context.Background(), &pb.GetChunkLocationRequest{
 		FileId: fileID,
 	})
 	if err != nil {
-		return fileData, err
+		return nil, err
 	}
 
-	// Step 2: Sort chunks by Index to ensure correct order
-	sort.Slice(locationResp.Locs, func(i, j int) bool {
-		return locationResp.Locs[i].Index < locationResp.Locs[j].Index
-	})
+	// Channel to collect results from goroutines
+	results := make(chan ChunkResult, len(locationResp.Locs))
+	var wg sync.WaitGroup
 
-	// Step 3: For each ChunkLocation, check heartbeat and read
+	// Step 2: Read chunks in PARALLEL using goroutines
 	for _, chunkLocation := range locationResp.Locs {
-		chunkRead := false
+		wg.Add(1)
+		go func(cl *pb.ChunkLocation) {
+			defer wg.Done()
 
-		// Step 4: Try each replica until find active DataNode
-		for _, replica := range chunkLocation.Replicas {
-			// Check if DataNode is active using Heartbeat with 0.5s timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-			defer cancel()
+			// Try each replica until find active DataNode
+			for _, replica := range cl.Replicas {
+				// Check if DataNode is active using Heartbeat with 0.5s timeout
+				ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+				defer cancel()
 
-			heartbeatResp, err := s.nodeControlClient.Heartbeat(ctx, &pb.HeartbeatRequest{
-				NodeId:  replica.NodeId,
-				Address: replica.Address,
-			})
+				heartbeatResp, err := s.nodeControlClient.Heartbeat(ctx, &pb.HeartbeatRequest{
+					NodeId:  replica.NodeId,
+					Address: replica.Address,
+				})
 
-			if err == nil && heartbeatResp.Status {
-				// DataNode is active - read chunk
-				req := &pb.ChunkReadRequest{
-					ChunkId: chunkLocation.ChunkId,
-					Offset:  0,
-					Length:  33554432, // 32 MB
-				}
+				if err == nil && heartbeatResp.Status {
+					// DataNode is active - read chunk
+					req := &pb.ChunkReadRequest{
+						ChunkId: cl.ChunkId,
+						Offset:  0,
+						Length:  33554432, // 32 MB
+					}
 
-				resp, err := s.dataNodeClient.ReadChunk(context.Background(), req)
-				if err == nil {
-					fileData = append(fileData, resp.Data...)
-
-					if resp.Eof {
-						chunkRead = true
-						break
+					resp, err := s.dataNodeClient.ReadChunk(context.Background(), req)
+					if err == nil {
+						// Send result with Index for ordering
+						results <- ChunkResult{
+							Index: int(cl.Index),
+							Data:  resp.Data,
+							Error: nil,
+						}
+						return
 					}
 				}
 			}
-		}
 
-		// Step 5: If chunk couldn't be read from any replica, fail completely
-		if !chunkRead {
-			return fileData, fmt.Errorf("failed to read chunk %s from any replica", chunkLocation.ChunkId)
+			// If we get here, chunk couldn't be read from any replica
+			results <- ChunkResult{
+				Index: int(cl.Index),
+				Data:  nil,
+				Error: fmt.Errorf("failed to read chunk %s from any replica", cl.ChunkId),
+			}
+		}(chunkLocation)
+	}
+
+	// Close channel when all goroutines are done
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results
+	var chunkResults []ChunkResult
+	for result := range results {
+		if result.Error != nil {
+			return nil, result.Error
 		}
+		chunkResults = append(chunkResults, result)
+	}
+
+	// Step 3: Sort AFTER reading by Index to ensure correct order
+	sort.Slice(chunkResults, func(i, j int) bool {
+		return chunkResults[i].Index < chunkResults[j].Index
+	})
+
+	// Step 4: Concatenate in correct order
+	fileData := []byte{}
+	for _, result := range chunkResults {
+		fileData = append(fileData, result.Data...)
 	}
 
 	return fileData, nil

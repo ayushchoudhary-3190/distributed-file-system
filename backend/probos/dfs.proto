@@ -10,6 +10,7 @@ service MetaService{
     rpc UploadRequest(UploadFileRequest) returns (UploadFileResponse);
     // Deleterequest deletes file metadata of given file
     rpc DeleteRequest(DeleteFileRequest) returns (DeleteFileResponse);
+    // ListFiles lists all files for a given owner
     rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
     rpc GetFile(GetFileRequest) returns (GetFileResponse);
 
