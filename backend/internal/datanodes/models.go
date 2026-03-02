@@ -1,13 +1,13 @@
 package datanodeservice
 
-
-type Chunk_table struct{
-	ChunkID string `gorm:"primaryKey"`
+type Chunk_table struct {
+	ChunkID string   `gorm:"primaryKey"`
 	NodeID  []string `gorm:"type:text[];not null"`
-	Index	int64  
+	Index   int64
 }
 
-type Node_table struct{
-	NodeID string
-	BaseDir string
+type Node_table struct {
+	NodeID        string
+	BaseDir       string
+	LastHeartbeat int64 // timestamp
 }

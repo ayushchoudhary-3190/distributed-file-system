@@ -3,6 +3,8 @@ package datanodeservice
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/ayushchoudhary-3190/Distributed_file_system/pb"
 	"gorm.io/gorm"
 )
@@ -10,6 +12,11 @@ import (
 type datanodeserver struct {
 	DB *gorm.DB
 	pb.UnimplementedDataNodeServiceServer
+}
+
+type nodeserver struct {
+	DB *gorm.DB
+	pb.UnimplementedNodeControlServiceServer
 }
 
 func (dns *datanodeserver) WriteChunk(ctx context.Context, req *pb.ChunkWriteRequest) (*pb.ChunkWriteResponse, error) {
@@ -115,4 +122,44 @@ func GetChunkAddress(db *gorm.DB, chunkID string) []*pb.DataNodeEndpoint { //// 
 	}
 
 	return endpoints
+}
+
+// Heartbeat is the RPC implementation for NodeControlService
+// It checks if a node is active by verifying node_id and address, and updates heartbeat timestamp
+func (ns *nodeserver) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
+	// Step 1: Validate request
+	if req.NodeId == "" {
+		return &pb.HeartbeatResponse{
+			Status:  false,
+			Message: "node_id cannot be empty",
+		}, nil
+	}
+
+	// Step 2: Check if node exists in Node_table
+	var node Node_table
+	result := ns.DB.Where("node_id = ?", req.NodeId).First(&node)
+	if result.Error != nil {
+		return &pb.HeartbeatResponse{
+			Status:  false,
+			Message: "node not found",
+		}, nil
+	}
+
+	// Step 3: Verify address matches
+	if node.BaseDir != req.Address {
+		return &pb.HeartbeatResponse{
+			Status:  false,
+			Message: "address mismatch",
+		}, nil
+	}
+
+	// Step 4: Update last heartbeat timestamp
+	node.LastHeartbeat = time.Now().Unix()
+	ns.DB.Save(&node)
+
+	// Step 5: Return success
+	return &pb.HeartbeatResponse{
+		Status:  true,
+		Message: "node is active",
+	}, nil
 }

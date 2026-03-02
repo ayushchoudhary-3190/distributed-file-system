@@ -35,6 +35,7 @@ type MetaServiceClient interface {
 	UploadRequest(ctx context.Context, in *UploadFileRequest, opts ...grpc.CallOption) (*UploadFileResponse, error)
 	// Deleterequest deletes file metadata of given file
 	DeleteRequest(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*DeleteFileResponse, error)
+	// ListFiles lists all files for a given owner
 	ListFiles(ctx context.Context, in *ListFilesRequest, opts ...grpc.CallOption) (*ListFilesResponse, error)
 	GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (*GetFileResponse, error)
 	AllocateChunks(ctx context.Context, in *AllocateChunksRequest, opts ...grpc.CallOption) (*AllocateChunksResponse, error)
@@ -117,6 +118,7 @@ type MetaServiceServer interface {
 	UploadRequest(context.Context, *UploadFileRequest) (*UploadFileResponse, error)
 	// Deleterequest deletes file metadata of given file
 	DeleteRequest(context.Context, *DeleteFileRequest) (*DeleteFileResponse, error)
+	// ListFiles lists all files for a given owner
 	ListFiles(context.Context, *ListFilesRequest) (*ListFilesResponse, error)
 	GetFile(context.Context, *GetFileRequest) (*GetFileResponse, error)
 	AllocateChunks(context.Context, *AllocateChunksRequest) (*AllocateChunksResponse, error)
