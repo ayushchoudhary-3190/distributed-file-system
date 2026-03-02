@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dfs-cluster
+---
+# PersistentVolumeClaim for DataNode storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: datanode-storage
+  namespace: dfs-cluster
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# DataNodeService - 3 replicas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datanode-deployment
+  namespace: dfs-cluster
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: datanode
+  template:
+    metadata:
+      labels:
+        app: datanode
+    spec:
+      containers:
+      - name: datanode
+        image: datanode:latest
+        ports:
+        - containerPort: 50051
+        - containerPort: 50052
+        - containerPort: 50053
+        volumeMounts:
+        - name: datanode-storage
+          mountPath: /data/chunks
+        env:
+        - name: ""
+          value: ""
+---
+# MetaService - 1 replica
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metaservice-deployment
+  namespace: dfs-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metaservice
+  template:
+    metadata:
+      labels:
+        app: metaservice
+    spec:
+      containers:
+      - name: metaservice
+        image: metaservice:latest
+        ports:
+        - containerPort: 50055
+        env:
+        - name: ""
+          value: ""
+---
+# NodeControlService - 1 replica
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodecontrol-deployment
+  namespace: dfs-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodecontrol
+  template:
+    metadata:
+      labels:
+        app: nodecontrol
+    spec:
+      containers:
+      - name: nodecontrol
+        image: nodecontrol:latest
+        ports:
+        - containerPort: 50056
+        env:
+        - name: ""
+          value: ""
+---
+# Service for DataNode (load balancer for the 3 pods)
+apiVersion: v1
+kind: Service
+metadata:
+  name: datanode-service
+  namespace: dfs-cluster
+spec:
+  selector:
+    app: datanode
+  ports:
+  - name: datanode-1
+    port: 50051
+    targetPort: 50051
+  - name: datanode-2
+    port: 50052
+    targetPort: 50052
+  - name: datanode-3
+    port: 50053
+    targetPort: 50053
+---
+# Service for MetaService
+apiVersion: v1
+kind: Service
+metadata:
+  name: metaservice-service
+  namespace: dfs-cluster
+spec:
+  selector:
+    app: metaservice
+  ports:
+  - port: 50055
+    targetPort: 50055
+---
+# Service for NodeControlService
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodecontrol-service
+  namespace: dfs-cluster
+spec:
+  selector:
+    app: nodecontrol
+  ports:
+  - port: 50056
+    targetPort: 50056
