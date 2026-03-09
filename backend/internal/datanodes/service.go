@@ -3,6 +3,8 @@ package datanodeservice
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/pb"
@@ -10,13 +12,33 @@ import (
 )
 
 type datanodeserver struct {
-	DB *gorm.DB
+	DB          *gorm.DB
+	NodeID      string
+	NodeAddress string
 	pb.UnimplementedDataNodeServiceServer
 }
 
 type nodeserver struct {
 	DB *gorm.DB
 	pb.UnimplementedNodeControlServiceServer
+}
+
+func NewDataNodeServer(db *gorm.DB) (*datanodeserver, error) {
+	nodeID := os.Getenv("NODE_ID")
+	nodeAddress := os.Getenv("NODE_ADDRESS")
+
+	if nodeID == "" {
+		return nil, fmt.Errorf("NODE_ID environment variable not set")
+	}
+	if nodeAddress == "" {
+		return nil, fmt.Errorf("NODE_ADDRESS environment variable not set")
+	}
+
+	return &datanodeserver{
+		DB:          db,
+		NodeID:      nodeID,
+		NodeAddress: nodeAddress,
+	}, nil
 }
 
 func (dns *datanodeserver) WriteChunk(ctx context.Context, req *pb.ChunkWriteRequest) (*pb.ChunkWriteResponse, error) {
@@ -84,12 +106,24 @@ func (dns *datanodeserver) ReadChunk(ctx context.Context, req *pb.ChunkReadReque
 	}
 }
 
-// readChunkFromStorage is a helper function to read chunk data from storage (placeholder)
+// readChunkFromStorage reads chunk binary data from local storage
+// Path format: {NodeAddress}/{chunkID}.bin
 func (dns *datanodeserver) readChunkFromStorage(chunkID string) ([]byte, error) {
-	// TODO: Implement actual storage reading logic
-	// This should read chunk data from disk, database, or other storage
-	// For now, return sample data
-	return []byte("sample chunk data for " + chunkID), nil
+	if dns.NodeAddress == "" {
+		return nil, fmt.Errorf("node address not configured")
+	}
+
+	filePath := filepath.Join(dns.NodeAddress, chunkID+".bin")
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("chunk %s not found at %s", chunkID, filePath)
+		}
+		return nil, fmt.Errorf("failed to read chunk %s: %w", chunkID, err)
+	}
+
+	return data, nil
 }
 
 // getChunkAddress is a package-level helper function that returns array of node endpoints for a chunk
