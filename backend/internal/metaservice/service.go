@@ -8,9 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/client"
 	datanodeservice "github.com/ayushchoudhary-3190/Distributed_file_system/internal/datanodes"
-	"github.com/ayushchoudhary-3190/Distributed_file_system/internal/metaservice"
 	pb "github.com/ayushchoudhary-3190/Distributed_file_system/pb"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -40,7 +38,7 @@ func (s *MetaServer) UploadRequest(ctx context.Context, req *pb.UploadFileReques
 		chunkArray[i] = chunk.Chunkid
 	}
 
-	file := metaservice.File_table{
+	file := File_table{
 		FileID:     req.Fileid,
 		FileName:   req.Filename,
 		OwnerID:    req.Ownerid,
@@ -82,7 +80,7 @@ func (s *MetaServer) DeleteRequest(ctx context.Context, req *pb.DeleteFileReques
 	tx := s.DB.Begin()
 
 	// Find and delete the file with the given path
-	result := tx.Where("file_name = ?", req.Path).Delete(&metaservice.File_table{})
+	result := tx.Where("file_name = ?", req.Path).Delete(&File_table{})
 
 	if result.Error != nil {
 		tx.Rollback()

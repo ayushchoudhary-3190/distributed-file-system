@@ -796,7 +796,7 @@ type GetChunkLocationRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Chunkids []string `protobuf:"bytes,1,rep,name=chunkids,proto3" json:"chunkids,omitempty"`
+	FileId string `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
 }
 
 func (x *GetChunkLocationRequest) Reset() {
@@ -831,11 +831,11 @@ func (*GetChunkLocationRequest) Descriptor() ([]byte, []int) {
 	return file_dfs_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *GetChunkLocationRequest) GetChunkids() []string {
+func (x *GetChunkLocationRequest) GetFileId() string {
 	if x != nil {
-		return x.Chunkids
+		return x.FileId
 	}
-	return nil
+	return ""
 }
 
 type GetChunkLocationResponse struct {

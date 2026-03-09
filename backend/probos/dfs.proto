@@ -106,7 +106,7 @@ message AllocateChunksResponse{
 }
 
 message GetChunkLocationRequest{
-    repeated string chunkids = 1;
+    string file_id = 1;
 }
 
 message GetChunkLocationResponse{
