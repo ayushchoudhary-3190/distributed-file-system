@@ -23,7 +23,7 @@ func (dns *datanodeserver) WriteChunk(ctx context.Context, req *pb.ChunkWriteReq
 
 }
 
-func (dns *datanodeserver) ReadChunks(ctx context.Context, req *pb.ChunkReadRequest) (*pb.ChunkReadResponse, error) {
+func (dns *datanodeserver) ReadChunk(ctx context.Context, req *pb.ChunkReadRequest) (*pb.ChunkReadResponse, error) {
 	// Handle edge case: empty chunk_id
 	if req.ChunkId == "" {
 		response := &pb.ChunkReadResponse{

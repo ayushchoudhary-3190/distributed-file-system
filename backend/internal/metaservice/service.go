@@ -342,3 +342,69 @@ func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLoc
 		Locs: chunkLocations,
 	}, nil
 }
+
+// AllocateChunks is a gRPC function that allocates chunks for a file
+// It selects DataNodes based on capacity and returns chunk locations
+func (s *MetaServer) AllocateChunks(ctx context.Context, req *pb.AllocateChunksRequest) (*pb.AllocateChunksResponse, error) { //// metaservice gRPC function
+	// Step 1: Get available DataNodes from Node_table
+	// We need to access the datanodes package to query Node_table
+	// For now, use placeholder approach - will be implemented with actual Node_table access
+
+	// Get available nodes (placeholder - query from database)
+	// This should query the Node_table in datanodes package to get all available nodes
+	// Then sort by available capacity
+
+	var availableNodes []string
+	var nodeAddresses map[string]string
+
+	// Placeholder: we'll use a simple approach
+	// In actual implementation, query Node_table from datanodes database
+	availableNodes = []string{"node1", "node2", "node3"}
+	nodeAddresses = map[string]string{
+		"node1": "localhost:50051",
+		"node2": "localhost:50052",
+		"node3": "localhost:50053",
+	}
+
+	// Step 2: Generate chunk locations for each chunk
+	var chunkLocations []*pb.ChunkLocation
+
+	for i := int64(0); i < req.Count; i++ {
+		// Generate unique chunk_id
+		chunkID := uuid.New().String()
+
+		// Select top 3 nodes with most capacity (round-robin for now as capacity not implemented)
+		var replicas []*pb.DataNodeEndpoint
+
+		// Select 3 replicas based on available nodes
+		replicaCount := int64(3)
+		if req.Count < 3 {
+			replicaCount = req.Count
+		}
+
+		for j := int64(0); j < replicaCount; j++ {
+			nodeIndex := (i + j) % int64(len(availableNodes))
+			nodeID := availableNodes[nodeIndex]
+
+			replicas = append(replicas, &pb.DataNodeEndpoint{
+				NodeId:  nodeID,
+				Address: nodeAddresses[nodeID],
+			})
+		}
+
+		// Create ChunkLocation
+		chunkLocation := &pb.ChunkLocation{
+			ChunkId:  chunkID,
+			Index:    int32(i),
+			Replicas: replicas,
+		}
+
+		chunkLocations = append(chunkLocations, chunkLocation)
+	}
+
+	// Step 3: Return AllocateChunksResponse (NO database writes yet!)
+	return &pb.AllocateChunksResponse{
+		FileId: req.FileId,
+		Chunks: chunkLocations,
+	}, nil
+}
