@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v3.19.6
-// source: dfs.proto
+// source: probos/dfs.proto
 
 package pb
 
@@ -302,7 +302,7 @@ var MetaService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "dfs.proto",
+	Metadata: "probos/dfs.proto",
 }
 
 const (
@@ -315,7 +315,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DataNodeServiceClient interface {
-	WriteChunk(ctx context.Context, opts ...grpc.CallOption) (DataNodeService_WriteChunkClient, error)
+	WriteChunk(ctx context.Context, in *ChunkWriteRequest, opts ...grpc.CallOption) (*ChunkWriteResponse, error)
 	ReadChunk(ctx context.Context, in *ChunkReadRequest, opts ...grpc.CallOption) (*ChunkReadResponse, error)
 	// DeleteChunk deletes a chunk from the data node
 	DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkResponse, error)
@@ -329,39 +329,14 @@ func NewDataNodeServiceClient(cc grpc.ClientConnInterface) DataNodeServiceClient
 	return &dataNodeServiceClient{cc}
 }
 
-func (c *dataNodeServiceClient) WriteChunk(ctx context.Context, opts ...grpc.CallOption) (DataNodeService_WriteChunkClient, error) {
+func (c *dataNodeServiceClient) WriteChunk(ctx context.Context, in *ChunkWriteRequest, opts ...grpc.CallOption) (*ChunkWriteResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataNodeService_ServiceDesc.Streams[0], DataNodeService_WriteChunk_FullMethodName, cOpts...)
+	out := new(ChunkWriteResponse)
+	err := c.cc.Invoke(ctx, DataNodeService_WriteChunk_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &dataNodeServiceWriteChunkClient{ClientStream: stream}
-	return x, nil
-}
-
-type DataNodeService_WriteChunkClient interface {
-	Send(*ChunkWriteRequest) error
-	CloseAndRecv() (*ChunkWriteResponse, error)
-	grpc.ClientStream
-}
-
-type dataNodeServiceWriteChunkClient struct {
-	grpc.ClientStream
-}
-
-func (x *dataNodeServiceWriteChunkClient) Send(m *ChunkWriteRequest) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *dataNodeServiceWriteChunkClient) CloseAndRecv() (*ChunkWriteResponse, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(ChunkWriteResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 func (c *dataNodeServiceClient) ReadChunk(ctx context.Context, in *ChunkReadRequest, opts ...grpc.CallOption) (*ChunkReadResponse, error) {
@@ -388,7 +363,7 @@ func (c *dataNodeServiceClient) DeleteChunk(ctx context.Context, in *DeleteChunk
 // All implementations must embed UnimplementedDataNodeServiceServer
 // for forward compatibility
 type DataNodeServiceServer interface {
-	WriteChunk(DataNodeService_WriteChunkServer) error
+	WriteChunk(context.Context, *ChunkWriteRequest) (*ChunkWriteResponse, error)
 	ReadChunk(context.Context, *ChunkReadRequest) (*ChunkReadResponse, error)
 	// DeleteChunk deletes a chunk from the data node
 	DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkResponse, error)
@@ -399,8 +374,8 @@ type DataNodeServiceServer interface {
 type UnimplementedDataNodeServiceServer struct {
 }
 
-func (UnimplementedDataNodeServiceServer) WriteChunk(DataNodeService_WriteChunkServer) error {
-	return status.Errorf(codes.Unimplemented, "method WriteChunk not implemented")
+func (UnimplementedDataNodeServiceServer) WriteChunk(context.Context, *ChunkWriteRequest) (*ChunkWriteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WriteChunk not implemented")
 }
 func (UnimplementedDataNodeServiceServer) ReadChunk(context.Context, *ChunkReadRequest) (*ChunkReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadChunk not implemented")
@@ -421,30 +396,22 @@ func RegisterDataNodeServiceServer(s grpc.ServiceRegistrar, srv DataNodeServiceS
 	s.RegisterService(&DataNodeService_ServiceDesc, srv)
 }
 
-func _DataNodeService_WriteChunk_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(DataNodeServiceServer).WriteChunk(&dataNodeServiceWriteChunkServer{ServerStream: stream})
-}
-
-type DataNodeService_WriteChunkServer interface {
-	SendAndClose(*ChunkWriteResponse) error
-	Recv() (*ChunkWriteRequest, error)
-	grpc.ServerStream
-}
-
-type dataNodeServiceWriteChunkServer struct {
-	grpc.ServerStream
-}
-
-func (x *dataNodeServiceWriteChunkServer) SendAndClose(m *ChunkWriteResponse) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *dataNodeServiceWriteChunkServer) Recv() (*ChunkWriteRequest, error) {
-	m := new(ChunkWriteRequest)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
+func _DataNodeService_WriteChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChunkWriteRequest)
+	if err := dec(in); err != nil {
 		return nil, err
 	}
-	return m, nil
+	if interceptor == nil {
+		return srv.(DataNodeServiceServer).WriteChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataNodeService_WriteChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataNodeServiceServer).WriteChunk(ctx, req.(*ChunkWriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DataNodeService_ReadChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -491,6 +458,10 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*DataNodeServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "WriteChunk",
+			Handler:    _DataNodeService_WriteChunk_Handler,
+		},
+		{
 			MethodName: "ReadChunk",
 			Handler:    _DataNodeService_ReadChunk_Handler,
 		},
@@ -499,14 +470,8 @@ var DataNodeService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DataNodeService_DeleteChunk_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "WriteChunk",
-			Handler:       _DataNodeService_WriteChunk_Handler,
-			ClientStreams: true,
-		},
-	},
-	Metadata: "dfs.proto",
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "probos/dfs.proto",
 }
 
 const (
@@ -635,5 +600,5 @@ var NodeControlService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "dfs.proto",
+	Metadata: "probos/dfs.proto",
 }

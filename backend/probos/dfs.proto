@@ -19,7 +19,7 @@ service MetaService{
 }
 
 service DataNodeService {
-  rpc WriteChunk(stream ChunkWriteRequest) returns (ChunkWriteResponse);
+  rpc WriteChunk(ChunkWriteRequest) returns (ChunkWriteResponse);
   rpc ReadChunk(ChunkReadRequest) returns (ChunkReadResponse);
   // DeleteChunk deletes a chunk from the data node
   rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkResponse);
