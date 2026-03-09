@@ -42,7 +42,22 @@ func NewDataNodeServer(db *gorm.DB) (*datanodeserver, error) {
 }
 
 func (dns *datanodeserver) WriteChunk(ctx context.Context, req *pb.ChunkWriteRequest) (*pb.ChunkWriteResponse, error) {
+	if req.ChunkId == "" {
+		return &pb.ChunkWriteResponse{Ok: false}, fmt.Errorf("chunk_id cannot be empty")
+	}
 
+	if len(req.Data) == 0 {
+		return &pb.ChunkWriteResponse{Ok: false}, fmt.Errorf("chunk data cannot be empty")
+	}
+
+	filePath := filepath.Join(dns.NodeAddress, req.ChunkId+".bin")
+
+	err := os.WriteFile(filePath, req.Data, 0600)
+	if err != nil {
+		return &pb.ChunkWriteResponse{Ok: false}, fmt.Errorf("failed to write chunk: %w", err)
+	}
+
+	return &pb.ChunkWriteResponse{Ok: true}, nil
 }
 
 func (dns *datanodeserver) ReadChunk(ctx context.Context, req *pb.ChunkReadRequest) (*pb.ChunkReadResponse, error) {
