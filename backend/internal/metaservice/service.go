@@ -120,7 +120,7 @@ func (s *MetaServer) DeleteRequest(ctx context.Context, req *pb.DeleteFileReques
 
 // function to list files belonging to a specific owner
 func (s *MetaServer) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*pb.ListFilesResponse, error) {
-	var files []metaservice.File_table
+	var files []File_table
 
 	// Query files by owner_id
 	result := s.DB.Where("owner_id = ?", req.OwnerId).Find(&files)
@@ -156,7 +156,7 @@ func (s *MetaServer) ListFiles(ctx context.Context, req *pb.ListFilesRequest) (*
 
 // function to get file by owner_id and path and reconstruct from chunks using new workflow
 func (s *MetaServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, error) {
-	var file metaservice.File_table
+	var file File_table
 
 	// Query file by owner_id and file_name (path)
 	result := s.DB.Where("owner_id = ? AND file_name = ?", req.OwnerId, req.Path).First(&file)
@@ -300,7 +300,7 @@ func (s *MetaServer) reconstructFileFromId(fileID string) ([]byte, error) { ////
 // 5. Returns structured data using ChunkLocation and DataNodeEndpoint from proto
 func (s *MetaServer) GetChunksLocations(ctx context.Context, req *pb.GetChunkLocationRequest) (*pb.GetChunkLocationResponse, error) { //// metaservice gRPC function
 	// Step 1: Scan metaservice table for file_id
-	var file metaservice.File_table
+	var file File_table
 	result := s.DB.Where("file_id = ?", req.FileId).First(&file)
 
 	if result.Error != nil {

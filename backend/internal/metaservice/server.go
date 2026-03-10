@@ -1,13 +1,14 @@
 package metaservice
 
 import (
-	"context"
 	"log"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/pb"
 	"google.golang.org/grpc"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	datanodeservice "github.com/ayushchoudhary-3190/Distributed_file_system/internal/datanodes"
 )
 
 var DB *gorm.DB
@@ -29,13 +30,13 @@ func main() {
 		log.Fatal("failed to connect database", err)
 	}
 
-	err = DB.AutoMigrate(&File_table{}, &Chunk_table{}, &Node_table{})
+	err = DB.AutoMigrate(&File_table{}, &datanodeservice.Chunk_table{}, &datanodeservice.Node_table{})
 	if err != nil {
 		log.Fatal("failed to create tables")
 	}
 
 	server := grpc.NewServer()
-	metaserver := &Metaserver{
+	_ = Metaserver{
 		DB: DB,
 	}
 
