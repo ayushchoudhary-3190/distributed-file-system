@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ayushchoudhary-3190/Distributed_file_system/pb"
 	"gorm.io/gorm"
 )
+
+func GetNodeAddress(nodeID string) string {
+	return os.Getenv("NODE_" + strings.ToUpper(nodeID) + "_ADDRESS")
+}
 
 type datanodeserver struct {
 	DB          *gorm.DB
@@ -155,18 +160,17 @@ func GetChunkAddress(db *gorm.DB, chunkID string) []*pb.DataNodeEndpoint { //// 
 		return endpoints
 	}
 
-	// Step 2: For each nodeID that has this chunk, query Node_table to get address
+	// Step 2: For each nodeID that has this chunk, get address from env
 	for _, nodeID := range chunk.NodeID {
-		var node Node_table
-		nodeResult := db.Where("node_id = ?", nodeID).First(&node)
-		if nodeResult.Error != nil {
-			continue // Skip if node not found
+		nodeAddr := GetNodeAddress(nodeID)
+		if nodeAddr == "" {
+			continue
 		}
 
 		// Step 3: Add to endpoints array
 		endpoints = append(endpoints, &pb.DataNodeEndpoint{
-			NodeId:  node.NodeID,
-			Address: node.BaseDir,
+			NodeId:  nodeID,
+			Address: nodeAddr,
 		})
 	}
 
@@ -174,7 +178,7 @@ func GetChunkAddress(db *gorm.DB, chunkID string) []*pb.DataNodeEndpoint { //// 
 }
 
 // Heartbeat is the RPC implementation for NodeControlService
-// It checks if a node is active by verifying node_id and address, and updates heartbeat timestamp
+// It checks if a node is active by verifying node_id and address from env, and updates heartbeat timestamp
 func (ns *nodeserver) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
 	// Step 1: Validate request
 	if req.NodeId == "" {
@@ -184,27 +188,30 @@ func (ns *nodeserver) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (
 		}, nil
 	}
 
-	// Step 2: Check if node exists in Node_table
-	var node Node_table
-	result := ns.DB.Where("node_id = ?", req.NodeId).First(&node)
-	if result.Error != nil {
+	// Step 2: Get expected address from env
+	expectedAddr := GetNodeAddress(req.NodeId)
+	if expectedAddr == "" {
 		return &pb.HeartbeatResponse{
 			Status:  false,
-			Message: "node not found",
+			Message: "node not configured",
 		}, nil
 	}
 
 	// Step 3: Verify address matches
-	if node.BaseDir != req.Address {
+	if expectedAddr != req.Address {
 		return &pb.HeartbeatResponse{
 			Status:  false,
 			Message: "address mismatch",
 		}, nil
 	}
 
-	// Step 4: Update last heartbeat timestamp
-	node.LastHeartbeat = time.Now().Unix()
-	ns.DB.Save(&node)
+	// Step 4: Update last heartbeat timestamp in Node_table
+	var node Node_table
+	result := ns.DB.Where("node_id = ?", req.NodeId).First(&node)
+	if result.Error == nil {
+		node.LastHeartbeat = time.Now().Unix()
+		ns.DB.Save(&node)
+	}
 
 	// Step 5: Return success
 	return &pb.HeartbeatResponse{

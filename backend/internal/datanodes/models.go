@@ -13,5 +13,5 @@ type Chunk_table struct {
 
 type Node_table struct {
 	NodeID        string
-	LastHeartbeat int64 // timestamp
+	LastHeartbeat int64
 }
