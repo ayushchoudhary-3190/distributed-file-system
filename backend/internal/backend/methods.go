@@ -1,9 +1,10 @@
-package backend
+package main
 
-import(
+import (
 	"strconv"
 )
-func StringToInt(param string) (int64,error){
+
+func StringToInt(param string) (int64, error) {
 	intVersion, err := strconv.ParseInt(param, 10, 64)
-	return intVersion,err
+	return intVersion, err
 }
